@@ -223,8 +223,8 @@ function TicketDesk({
             ...initialForm,
             ...parsedDraft,
           } as TicketForm;
-          restoredDraft.employeeName ||= reporterDefaults.employeeName;
-          restoredDraft.email ||= reporterDefaults.email;
+          restoredDraft.employeeName = reporterDefaults.employeeName;
+          restoredDraft.email = reporterDefaults.email;
           setForm(normalizeFaultSeverity(restoredDraft));
           setSaveState("Draft restored from this device");
         }

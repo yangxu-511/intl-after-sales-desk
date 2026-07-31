@@ -65,6 +65,11 @@ test("keeps the authenticated ticket form and removes obsolete fields", async ()
   );
   assert.ok(requiredFields);
   assert.doesNotMatch(requiredFields[1], /"employeeId"/);
+  assert.match(
+    source,
+    /restoredDraft\.employeeName = reporterDefaults\.employeeName/,
+  );
+  assert.match(source, /restoredDraft\.email = reporterDefaults\.email/);
 });
 
 test("keeps the approved email access list", async () => {
