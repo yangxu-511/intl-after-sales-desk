@@ -41,8 +41,10 @@ export default function AuthGate({ children }: AuthGateProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
@@ -61,13 +63,25 @@ export default function AuthGate({ children }: AuthGateProps) {
       setChecking(false);
     };
 
-    void supabase.auth.getSession().then(({ data, error }) => {
+    void supabase.auth.getSession().then(async ({ data, error }) => {
       if (error) {
         setErrorMessage("Secure sign-in is temporarily unavailable. Please try again.");
         setChecking(false);
         return;
       }
-      acceptSession(data.session);
+
+      if (!data.session) {
+        acceptSession(null);
+        return;
+      }
+
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        setErrorMessage("Secure sign-in is temporarily unavailable. Please try again.");
+        setChecking(false);
+        return;
+      }
+      acceptSession({ ...data.session, user: userData.user });
     });
 
     const {
@@ -95,10 +109,12 @@ export default function AuthGate({ children }: AuthGateProps) {
     };
   }, [session]);
 
+  const mustChangePassword =
+    session?.user.user_metadata?.must_change_password === true;
+
   async function requestSignIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorMessage("");
-    setMessage("");
 
     const address = email.trim().toLowerCase();
     if (!ALLOWED_EMAILS.has(address)) {
@@ -107,30 +123,55 @@ export default function AuthGate({ children }: AuthGateProps) {
     }
 
     setSubmitting(true);
-    const redirectUrl = new URL(window.location.href);
-    redirectUrl.search = "";
-    redirectUrl.hash = "";
-
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signInWithPassword({
       email: address,
-      options: {
-        emailRedirectTo: redirectUrl.toString(),
-        shouldCreateUser: false,
-      },
+      password,
     });
 
     setSubmitting(false);
     if (error) {
       setErrorMessage(
-        error.message.includes("rate limit")
-          ? "Too many sign-in attempts. Please wait before trying again."
-          : "The sign-in email could not be sent. Please try again.",
+        error.message.toLowerCase().includes("invalid login")
+          ? "The email or password is incorrect."
+          : "Sign-in is temporarily unavailable. Please try again.",
       );
       return;
     }
+    setPassword("");
+  }
 
-    setMessage(
-      "Check your inbox and open the one-time sign-in link. The link expires shortly.",
+  async function changePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setErrorMessage("");
+
+    if (newPassword.length < 8) {
+      setErrorMessage("Your new password must contain at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setErrorMessage("The two new passwords do not match.");
+      return;
+    }
+
+    setSubmitting(true);
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
+      data: {
+        ...session?.user.user_metadata,
+        must_change_password: false,
+      },
+    });
+    setSubmitting(false);
+
+    if (error) {
+      setErrorMessage("The password could not be updated. Please try again.");
+      return;
+    }
+
+    setNewPassword("");
+    setConfirmPassword("");
+    setSession((currentSession) =>
+      currentSession ? { ...currentSession, user: data.user } : currentSession,
     );
   }
 
@@ -141,6 +182,9 @@ export default function AuthGate({ children }: AuthGateProps) {
       setErrorMessage("Sign-out failed. Please refresh the page and try again.");
       return;
     }
+    setPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
     setSession(null);
   }
 
@@ -152,6 +196,68 @@ export default function AuthGate({ children }: AuthGateProps) {
           <strong>Secure access</strong>
           <p>Checking your sign-in status…</p>
         </div>
+      </main>
+    );
+  }
+
+  if (user && mustChangePassword) {
+    return (
+      <main className="auth-page">
+        <section className="auth-card" aria-labelledby="password-change-title">
+          <div className="auth-brand">
+            <span className="brand-mark">G</span>
+            <div>
+              <strong>International Service Desk</strong>
+              <small>{user.email}</small>
+            </div>
+          </div>
+
+          <div className="auth-copy">
+            <span className="section-kicker">FIRST SIGN-IN</span>
+            <h1 id="password-change-title">Create a new password</h1>
+            <p>
+              Your account is using a temporary password. Choose a private
+              password before continuing to the service desk.
+            </p>
+          </div>
+
+          <form className="auth-form" onSubmit={changePassword}>
+            <label htmlFor="new-password">New password</label>
+            <input
+              id="new-password"
+              type="password"
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+              autoComplete="new-password"
+              minLength={8}
+              required
+            />
+            <label htmlFor="confirm-password">Confirm new password</label>
+            <input
+              id="confirm-password"
+              type="password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              autoComplete="new-password"
+              minLength={8}
+              required
+            />
+            <button className="button button-primary" type="submit" disabled={submitting}>
+              {submitting ? "Updating…" : "Update password and continue"}
+              {!submitting && <span aria-hidden="true">→</span>}
+            </button>
+            <button className="text-button" type="button" onClick={() => void signOut()}>
+              Sign out and use another account
+            </button>
+          </form>
+
+          {errorMessage && <p className="auth-error" role="alert">{errorMessage}</p>}
+
+          <div className="auth-note">
+            <strong>Use at least 8 characters.</strong>
+            <p>Choose a private password and do not share it with other users.</p>
+          </div>
+        </section>
       </main>
     );
   }
@@ -173,8 +279,8 @@ export default function AuthGate({ children }: AuthGateProps) {
           <span className="section-kicker">SECURE ACCESS</span>
           <h1 id="auth-title">Sign in to continue</h1>
           <p>
-            Enter an approved work email. We will send a secure, one-time
-            sign-in link—no password is required.
+            Enter your approved work email and password to open the service
+            desk.
           </p>
         </div>
 
@@ -189,13 +295,21 @@ export default function AuthGate({ children }: AuthGateProps) {
             placeholder="name@company.com"
             required
           />
+          <label htmlFor="sign-in-password">Password</label>
+          <input
+            id="sign-in-password"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            autoComplete="current-password"
+            required
+          />
           <button className="button button-primary" type="submit" disabled={submitting}>
-            {submitting ? "Sending…" : "Send sign-in link"}
+            {submitting ? "Signing in…" : "Sign in"}
             {!submitting && <span aria-hidden="true">→</span>}
           </button>
         </form>
 
-        {message && <p className="auth-message" role="status">{message}</p>}
         {errorMessage && <p className="auth-error" role="alert">{errorMessage}</p>}
 
         <div className="auth-note">

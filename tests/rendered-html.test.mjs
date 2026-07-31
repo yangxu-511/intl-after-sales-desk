@@ -73,6 +73,11 @@ test("keeps the approved email access list", async () => {
   assert.match(source, /elephantsimon@163\.com/);
   assert.match(source, /839079040@qq\.com/);
   assert.match(source, /xu\.yang2@getein\.cn/);
+  assert.match(source, /signInWithPassword/);
+  assert.match(source, /must_change_password/);
+  assert.match(source, /Create a new password/);
+  assert.doesNotMatch(source, /signInWithOtp/);
+  assert.doesNotMatch(source, /Send sign-in link/);
 });
 
 test("uses consistent fault levels and date-time export names", () => {
