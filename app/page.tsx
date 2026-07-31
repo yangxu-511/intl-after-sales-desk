@@ -1,6 +1,12 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  faultLevelDefinitions,
+  formatExportTimestamp,
+  normalizeFaultSeverity,
+  severityForFaultLevel,
+} from "./ticket-utils";
 
 type TicketForm = {
   employeeName: string;
@@ -102,11 +108,48 @@ const productCategories = [
 ];
 
 const serviceTypes = [
-  "Instrument issue",
-  "Reagent issue",
-  "Online installation",
-  "Remote service guidance",
-  "Market refurbishment / repair",
+  {
+    value: "Instrument issue",
+    description: "Instrument alarms, malfunction, abnormal operation, or hardware-related results.",
+  },
+  {
+    value: "Reagent issue",
+    description: "Reagent performance, lot, calibration, quality control, or stability concerns.",
+  },
+  {
+    value: "Online installation",
+    description: "Remote installation, setup, commissioning, or connectivity support.",
+  },
+  {
+    value: "Remote service guidance",
+    description: "Operational questions, troubleshooting guidance, or remote follow-up.",
+  },
+  {
+    value: "Market refurbishment / repair",
+    description: "Repair, refurbishment, or maintenance completed by the local market team.",
+  },
+];
+
+const ticketTemplateItems = [
+  {
+    title: "Issue title",
+    example: "[Product / model] — [symptom or error]",
+  },
+  {
+    title: "Issue description",
+    example:
+      "On [date/time], [customer/site] reported [symptom]. The issue affects [tests, samples, or workflow]. Error message: [exact text].",
+  },
+  {
+    title: "Actions taken",
+    example:
+      "Checked [items], performed [actions], and observed [result].",
+  },
+  {
+    title: "Result and follow-up",
+    example:
+      "Current status: [resolved or pending]. Next action: [owner, action, and expected time].",
+  },
 ];
 
 const crmFieldMap = [
@@ -188,11 +231,16 @@ export default function Home() {
         const savedDraft = window.localStorage.getItem(DRAFT_KEY);
         const savedSubmissions = window.localStorage.getItem(SUBMISSIONS_KEY);
         if (savedDraft) {
-          setForm({ ...initialForm, ...JSON.parse(savedDraft) });
+          const restoredDraft = {
+            ...initialForm,
+            ...JSON.parse(savedDraft),
+          } as TicketForm;
+          setForm(normalizeFaultSeverity(restoredDraft));
           setSaveState("Draft restored from this device");
         }
         if (savedSubmissions) {
-          setSubmissions(JSON.parse(savedSubmissions));
+          const restoredSubmissions = JSON.parse(savedSubmissions) as Submission[];
+          setSubmissions(restoredSubmissions.map(normalizeFaultSeverity));
         }
       } catch {
         setSaveState("Local save is unavailable");
@@ -247,6 +295,18 @@ export default function Home() {
   ) {
     const field = event.target.name as keyof TicketForm;
     const value = event.target.value;
+    if (field === "faultLevel") {
+      setForm((current) => ({
+        ...current,
+        faultLevel: value,
+        severity: severityForFaultLevel(value),
+      }));
+      setErrors((current) =>
+        current.filter((item) => item !== "faultLevel" && item !== "severity"),
+      );
+      setSuccessId("");
+      return;
+    }
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => current.filter((item) => item !== field));
     setSuccessId("");
@@ -360,9 +420,7 @@ export default function Home() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `international-after-sales-tickets-${new Date()
-      .toISOString()
-      .slice(0, 10)}.csv`;
+    link.download = `international-after-sales-tickets-${formatExportTimestamp()}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -454,6 +512,24 @@ export default function Home() {
             </div>
             <span className="save-status">{saveState}</span>
           </div>
+
+          <section className="ticket-template" aria-labelledby="template-title">
+            <div className="ticket-template-heading">
+              <span className="section-kicker">WRITING GUIDE</span>
+              <h2 id="template-title">English ticket template</h2>
+              <p>
+                Use this structure to make the issue clear and easy to hand over.
+              </p>
+            </div>
+            <div className="ticket-template-grid">
+              {ticketTemplateItems.map((item) => (
+                <article key={item.title}>
+                  <strong>{item.title}</strong>
+                  <code>{item.example}</code>
+                </article>
+              ))}
+            </div>
+          </section>
 
           {errors.length > 0 && (
             <div className="error-summary" role="alert">
@@ -588,8 +664,8 @@ export default function Home() {
             <section className="form-section">
               <SectionTitle
                 number="03"
-                title="Product"
-                subtitle="Identify the affected product."
+                title="Product & issue category"
+                subtitle="Identify the affected product and select the best issue category."
               />
               <div className="field-grid">
                 <div className={`field ${errorClass("serviceType")}`}>
@@ -606,7 +682,9 @@ export default function Home() {
                     onChange={updateField}
                   >
                     <option value="">Select service type</option>
-                    {serviceTypes.map((item) => <option key={item}>{item}</option>)}
+                    {serviceTypes.map((item) => (
+                      <option key={item.value}>{item.value}</option>
+                    ))}
                   </select>
                 </div>
                 <div className={`field ${errorClass("productCategory")}`}>
@@ -686,6 +764,17 @@ export default function Home() {
                     placeholder="For reagent cases"
                   />
                 </div>
+                <div className="definition-panel field-wide" aria-labelledby="category-guide-title">
+                  <h3 id="category-guide-title">Issue / service category guide</h3>
+                  <div className="category-guide-grid">
+                    {serviceTypes.map((item) => (
+                      <div key={item.value}>
+                        <strong>{item.value}</strong>
+                        <p>{item.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </section>
 
@@ -757,11 +846,14 @@ export default function Home() {
                     name="faultLevel"
                     value={form.faultLevel}
                     onChange={updateField}
+                    aria-describedby="fault-level-guide"
                   >
                     <option value="">Select</option>
-                    <option>Level 1</option>
-                    <option>Level 2</option>
-                    <option>Level 3</option>
+                    {faultLevelDefinitions.map((definition) => (
+                      <option key={definition.level} value={definition.level}>
+                        {definition.level} — {definition.severity}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className={`field ${errorClass("severity")}`}>
@@ -771,17 +863,14 @@ export default function Home() {
                     cn="严重程度"
                     required
                   />
-                  <select
+                  <input
                     id="severity"
                     name="severity"
                     value={form.severity}
-                    onChange={updateField}
-                  >
-                    <option value="">Select</option>
-                    <option>Minor</option>
-                    <option>Moderate</option>
-                    <option>Severe</option>
-                  </select>
+                    placeholder="Set automatically by fault level"
+                    readOnly
+                    className="derived-field"
+                  />
                 </div>
                 <div className="field">
                   <FieldLabel htmlFor="priority" label="Priority" cn="优先级" />
@@ -797,6 +886,20 @@ export default function Home() {
                     <option>High</option>
                     <option>Highest</option>
                   </select>
+                </div>
+                <div className="definition-panel field-wide" id="fault-level-guide">
+                  <h3>Fault level guide</h3>
+                  <div className="fault-level-grid">
+                    {faultLevelDefinitions.map((definition) => (
+                      <article key={definition.level}>
+                        <span className={`level-badge level-${definition.level.slice(-1)}`}>
+                          {definition.level}
+                        </span>
+                        <strong>{definition.severity}</strong>
+                        <p>{definition.description}</p>
+                      </article>
+                    ))}
+                  </div>
                 </div>
                 <div className="field">
                   <FieldLabel
@@ -965,8 +1068,11 @@ export default function Home() {
           <section className="submissions-panel" aria-labelledby="recent-title">
             <div className="submissions-heading">
               <div>
-                <span className="section-kicker">THIS DEVICE</span>
-                <h2 id="recent-title">Recent submissions</h2>
+                <span className="section-kicker">SAVED ON THIS DEVICE</span>
+                <h2 id="recent-title">Ticket records</h2>
+                <p>
+                  {submissions.length} {submissions.length === 1 ? "ticket" : "tickets"} saved locally
+                </p>
               </div>
               <button
                 className="button button-export"
@@ -985,21 +1091,57 @@ export default function Home() {
             ) : (
               <div className="ticket-list">
                 {submissions.map((ticket) => (
-                  <article key={ticket.ticketId} className="ticket-row">
-                    <div className="ticket-status" aria-hidden="true" />
-                    <div className="ticket-main">
-                      <strong>{ticket.issueTitle}</strong>
-                      <p>
-                        {ticket.customer} · {ticket.productName} · {ticket.country}
-                      </p>
+                  <details key={ticket.ticketId} className="ticket-record">
+                    <summary className="ticket-row">
+                      <div className="ticket-status" aria-hidden="true" />
+                      <div className="ticket-main">
+                        <strong>{ticket.issueTitle}</strong>
+                        <p>
+                          {ticket.customer} · {ticket.productName} · {ticket.country}
+                        </p>
+                        <span className={`level-badge level-${ticket.faultLevel.slice(-1)}`}>
+                          {ticket.faultLevel} · {ticket.severity}
+                        </span>
+                      </div>
+                      <div className="ticket-meta">
+                        <strong>{ticket.ticketId}</strong>
+                        <span>{new Date(ticket.submittedAt).toLocaleString()}</span>
+                        <small>View details</small>
+                      </div>
+                    </summary>
+                    <div className="ticket-details">
+                      <dl>
+                        <div>
+                          <dt>Reporter</dt>
+                          <dd>{ticket.employeeName} · {ticket.employeeId}</dd>
+                        </div>
+                        <div>
+                          <dt>Email</dt>
+                          <dd>{ticket.email || "Not recorded"}</dd>
+                        </div>
+                        <div>
+                          <dt>Issue category</dt>
+                          <dd>{ticket.serviceType}</dd>
+                        </div>
+                        <div>
+                          <dt>Product / model</dt>
+                          <dd>{ticket.productName} · {ticket.modelOrItem}</dd>
+                        </div>
+                        <div>
+                          <dt>Current result</dt>
+                          <dd>{ticket.currentResult}</dd>
+                        </div>
+                        <div>
+                          <dt>Priority</dt>
+                          <dd>{ticket.priority || "Not recorded"}</dd>
+                        </div>
+                      </dl>
+                      <div className="ticket-narrative">
+                        <strong>Issue description</strong>
+                        <p>{ticket.issueDescription}</p>
+                      </div>
                     </div>
-                    <div className="ticket-meta">
-                      <strong>{ticket.ticketId}</strong>
-                      <span>
-                        {new Date(ticket.submittedAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </article>
+                  </details>
                 ))}
               </div>
             )}

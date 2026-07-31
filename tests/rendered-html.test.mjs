@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import {
+  formatExportTimestamp,
+  severityForFaultLevel,
+} from "../app/ticket-utils.ts";
 
 async function render() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -30,9 +34,23 @@ test("renders the international after-sales ticket system", async () => {
   const html = await response.text();
   assert.match(html, /<title>International Service Desk<\/title>/i);
   assert.match(html, /New after-sales ticket/);
+  assert.match(html, /English ticket template/);
+  assert.match(html, /Issue \/ service category guide/);
+  assert.match(html, /Level 1/);
+  assert.match(html, /Severe/);
   assert.match(html, /Customer issue description/);
-  assert.match(html, /Recent submissions/);
+  assert.match(html, /Ticket records/);
   assert.match(html, /No SalesEasy CRM write-back/);
   assert.doesNotMatch(html, /codex-preview/);
   assert.doesNotMatch(html, /react-loading-skeleton/);
+});
+
+test("uses consistent fault levels and date-time export names", () => {
+  assert.equal(severityForFaultLevel("Level 1"), "Severe");
+  assert.equal(severityForFaultLevel("Level 2"), "Moderate");
+  assert.equal(severityForFaultLevel("Level 3"), "Minor");
+  assert.equal(
+    formatExportTimestamp(new Date(2026, 6, 31, 20, 11, 33)),
+    "2026-07-31_20-11-33",
+  );
 });
