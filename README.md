@@ -7,9 +7,10 @@ employees.
 
 - English-first form with Chinese field references
 - fields mapped to the SalesEasy `外贸线上服务工单` business type
+- Supabase passwordless email authentication for pre-approved users
 - automatic draft saving in the current browser
 - local submission history and CSV export
-- no account, shared database, file upload, approval, or SalesEasy CRM write-back
+- no shared ticket database, file upload, approval, or SalesEasy CRM write-back
 
 ## Local use
 

@@ -7,6 +7,7 @@ import {
   normalizeFaultSeverity,
   severityForFaultLevel,
 } from "./ticket-utils";
+import AuthGate, { AccessUser } from "./auth-gate";
 
 type TicketForm = {
   employeeName: string;
@@ -215,8 +216,21 @@ function csvEscape(value: string | string[]) {
   return `"${String(text ?? "").replaceAll('"', '""')}"`;
 }
 
-export default function Home() {
-  const [form, setForm] = useState<TicketForm>(initialForm);
+function TicketDesk({
+  user,
+  onSignOut,
+}: {
+  user: AccessUser;
+  onSignOut: () => Promise<void>;
+}) {
+  const reporterDefaults = useMemo(
+    () => ({ employeeName: user.displayName, email: user.email }),
+    [user.displayName, user.email],
+  );
+  const [form, setForm] = useState<TicketForm>(() => ({
+    ...initialForm,
+    ...reporterDefaults,
+  }));
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [saveState, setSaveState] = useState("Draft not started");
@@ -237,6 +251,8 @@ export default function Home() {
             ...initialForm,
             ...parsedDraft,
           } as TicketForm;
+          restoredDraft.employeeName ||= reporterDefaults.employeeName;
+          restoredDraft.email ||= reporterDefaults.email;
           setForm(normalizeFaultSeverity(restoredDraft));
           setSaveState("Draft restored from this device");
         }
@@ -259,7 +275,7 @@ export default function Home() {
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [reporterDefaults]);
 
   useEffect(() => {
     if (!loaded) return;
@@ -342,7 +358,7 @@ export default function Home() {
       "Clear the current form? This will remove the draft saved on this device.",
     );
     if (!shouldClear) return;
-    setForm(initialForm);
+    setForm({ ...initialForm, ...reporterDefaults });
     setErrors([]);
     setSuccessId("");
     window.localStorage.removeItem(DRAFT_KEY);
@@ -376,7 +392,7 @@ export default function Home() {
       window.localStorage.removeItem(DRAFT_KEY);
       setSubmissions(next);
       setSuccessId(submission.ticketId);
-      setForm(initialForm);
+      setForm({ ...initialForm, ...reporterDefaults });
       setErrors([]);
       setSaveState("Ready for a new ticket");
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -446,9 +462,17 @@ export default function Home() {
             <small>国际售后服务台</small>
           </span>
         </a>
-        <div className="privacy-pill">
-          <span aria-hidden="true">●</span>
-          Local-only data
+        <div className="topbar-actions">
+          <div className="privacy-pill">
+            <span aria-hidden="true">●</span>
+            Local-only data
+          </div>
+          <div className="session-pill">
+            <span>{user.email}</span>
+            <button type="button" onClick={() => void onSignOut()}>
+              Sign out
+            </button>
+          </div>
         </div>
       </header>
 
@@ -1148,5 +1172,15 @@ export default function Home() {
         </section>
       </div>
     </main>
+  );
+}
+
+export default function Home() {
+  return (
+    <AuthGate>
+      {(user, signOut) => (
+        <TicketDesk user={user} onSignOut={signOut} />
+      )}
+    </AuthGate>
   );
 }
