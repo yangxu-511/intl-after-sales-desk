@@ -738,18 +738,6 @@ form {
   font-size: 12px;
 }
 
-.category-guide-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 13px 18px;
-}
-
-.category-guide-grid strong {
-  color: #35443b;
-  font-size: 11px;
-}
-
-.category-guide-grid p,
 .fault-level-grid p {
   margin: 4px 0 0;
   color: #748078;
@@ -1230,7 +1218,6 @@ footer strong {
   }
 
   .ticket-template-grid,
-  .category-guide-grid,
   .fault-level-grid,
   .ticket-details dl {
     grid-template-columns: 1fr;

@@ -45,15 +45,34 @@ test("renders the secure access gate before the ticket system", async () => {
   assert.doesNotMatch(html, /react-loading-skeleton/);
 });
 
-test("keeps the authenticated ticket form and removes market region", async () => {
+test("keeps the authenticated ticket form and removes obsolete fields", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   assert.match(source, /New after-sales ticket/);
   assert.match(source, /English ticket template/);
-  assert.match(source, /Issue \/ service category guide/);
   assert.match(source, /Customer issue description/);
   assert.match(source, /Ticket records/);
+  assert.match(source, /31 Jul 2026, 14:30/);
   assert.doesNotMatch(source, /Market region/);
   assert.doesNotMatch(source, /Select the internal region/);
+  assert.doesNotMatch(source, /Service type/);
+  assert.doesNotMatch(source, /Complaint case\?/);
+  assert.doesNotMatch(source, /Priority/);
+  assert.doesNotMatch(source, /Issue \/ service category guide/);
+  assert.doesNotMatch(source, /datetime-local/);
+
+  const requiredFields = source.match(
+    /const requiredFields: Array<keyof TicketForm> = \[([\s\S]*?)\];/,
+  );
+  assert.ok(requiredFields);
+  assert.doesNotMatch(requiredFields[1], /"employeeId"/);
+});
+
+test("keeps the approved email access list", async () => {
+  const source = await readFile(new URL("../app/auth-gate.tsx", import.meta.url), "utf8");
+  assert.match(source, /grel_xu@outlook\.com/);
+  assert.match(source, /elephantsimon@163\.com/);
+  assert.match(source, /839079040@qq\.com/);
+  assert.match(source, /xu\.yang2@getein\.cn/);
 });
 
 test("uses consistent fault levels and date-time export names", () => {

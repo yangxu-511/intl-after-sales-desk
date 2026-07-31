@@ -16,7 +16,6 @@ type TicketForm = {
   country: string;
   distributor: string;
   customer: string;
-  serviceType: string;
   productCategory: string;
   productName: string;
   modelOrItem: string;
@@ -24,10 +23,8 @@ type TicketForm = {
   reagentLot: string;
   issueTitle: string;
   issueDescription: string;
-  complaint: string;
   faultLevel: string;
   severity: string;
-  priority: string;
   downtimeStatus: string;
   downtimeHours: string;
   occurredAt: string;
@@ -52,7 +49,6 @@ const initialForm: TicketForm = {
   country: "",
   distributor: "",
   customer: "",
-  serviceType: "",
   productCategory: "",
   productName: "",
   modelOrItem: "",
@@ -60,10 +56,8 @@ const initialForm: TicketForm = {
   reagentLot: "",
   issueTitle: "",
   issueDescription: "",
-  complaint: "",
   faultLevel: "",
   severity: "",
-  priority: "",
   downtimeStatus: "",
   downtimeHours: "",
   occurredAt: "",
@@ -75,16 +69,13 @@ const initialForm: TicketForm = {
 
 const requiredFields: Array<keyof TicketForm> = [
   "employeeName",
-  "employeeId",
   "country",
   "customer",
-  "serviceType",
   "productCategory",
   "productName",
   "modelOrItem",
   "issueTitle",
   "issueDescription",
-  "complaint",
   "faultLevel",
   "severity",
   "currentResult",
@@ -104,29 +95,6 @@ const productCategories = [
   "POCT instrument",
   "POCT reagent",
   "Biochemistry & immunoassay automation",
-];
-
-const serviceTypes = [
-  {
-    value: "Instrument issue",
-    description: "Instrument alarms, malfunction, abnormal operation, or hardware-related results.",
-  },
-  {
-    value: "Reagent issue",
-    description: "Reagent performance, lot, calibration, quality control, or stability concerns.",
-  },
-  {
-    value: "Online installation",
-    description: "Remote installation, setup, commissioning, or connectivity support.",
-  },
-  {
-    value: "Remote service guidance",
-    description: "Operational questions, troubleshooting guidance, or remote follow-up.",
-  },
-  {
-    value: "Market refurbishment / repair",
-    description: "Repair, refurbishment, or maintenance completed by the local market team.",
-  },
 ];
 
 const ticketTemplateItems = [
@@ -152,10 +120,8 @@ const ticketTemplateItems = [
 ];
 
 const crmFieldMap = [
-  ["Service type", "线上服务类型"],
   ["Product category", "产品分类"],
   ["Model / reagent item", "型号 or 试剂项目"],
-  ["Complaint case", "是否为投诉类"],
   ["Fault level", "故障等级"],
   ["Severity", "严重程度"],
   ["Issue description", "客户问题描述"],
@@ -245,8 +211,14 @@ function TicketDesk({
         if (savedDraft) {
           const parsedDraft = JSON.parse(savedDraft) as Partial<TicketForm> & {
             region?: unknown;
+            serviceType?: unknown;
+            complaint?: unknown;
+            priority?: unknown;
           };
           delete parsedDraft.region;
+          delete parsedDraft.serviceType;
+          delete parsedDraft.complaint;
+          delete parsedDraft.priority;
           const restoredDraft = {
             ...initialForm,
             ...parsedDraft,
@@ -258,11 +230,19 @@ function TicketDesk({
         }
         if (savedSubmissions) {
           const restoredSubmissions = JSON.parse(savedSubmissions) as Array<
-            Submission & { region?: unknown }
+            Submission & {
+              region?: unknown;
+              serviceType?: unknown;
+              complaint?: unknown;
+              priority?: unknown;
+            }
           >;
           setSubmissions(
             restoredSubmissions.map((ticket) => {
               delete ticket.region;
+              delete ticket.serviceType;
+              delete ticket.complaint;
+              delete ticket.priority;
               return normalizeFaultSeverity(ticket);
             }),
           );
@@ -412,7 +392,6 @@ function TicketDesk({
       "country",
       "distributor",
       "customer",
-      "serviceType",
       "productCategory",
       "productName",
       "modelOrItem",
@@ -420,10 +399,8 @@ function TicketDesk({
       "reagentLot",
       "issueTitle",
       "issueDescription",
-      "complaint",
       "faultLevel",
       "severity",
-      "priority",
       "downtimeStatus",
       "downtimeHours",
       "occurredAt",
@@ -594,12 +571,11 @@ function TicketDesk({
                     autoComplete="name"
                   />
                 </div>
-                <div className={`field ${errorClass("employeeId")}`}>
+                <div className="field">
                   <FieldLabel
                     htmlFor="employeeId"
                     label="Employee ID"
                     cn="员工编号"
-                    required
                   />
                   <input
                     id="employeeId"
@@ -682,29 +658,10 @@ function TicketDesk({
             <section className="form-section">
               <SectionTitle
                 number="03"
-                title="Product & issue category"
-                subtitle="Identify the affected product and select the best issue category."
+                title="Product information"
+                subtitle="Identify the affected product."
               />
               <div className="field-grid">
-                <div className={`field ${errorClass("serviceType")}`}>
-                  <FieldLabel
-                    htmlFor="serviceType"
-                    label="Service type"
-                    cn="线上服务类型"
-                    required
-                  />
-                  <select
-                    id="serviceType"
-                    name="serviceType"
-                    value={form.serviceType}
-                    onChange={updateField}
-                  >
-                    <option value="">Select service type</option>
-                    {serviceTypes.map((item) => (
-                      <option key={item.value}>{item.value}</option>
-                    ))}
-                  </select>
-                </div>
                 <div className={`field ${errorClass("productCategory")}`}>
                   <FieldLabel
                     htmlFor="productCategory"
@@ -782,17 +739,6 @@ function TicketDesk({
                     placeholder="For reagent cases"
                   />
                 </div>
-                <div className="definition-panel field-wide" aria-labelledby="category-guide-title">
-                  <h3 id="category-guide-title">Issue / service category guide</h3>
-                  <div className="category-guide-grid">
-                    {serviceTypes.map((item) => (
-                      <div key={item.value}>
-                        <strong>{item.value}</strong>
-                        <p>{item.description}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
               </div>
             </section>
 
@@ -834,24 +780,6 @@ function TicketDesk({
                     placeholder="Include the error message, when it started, frequency, affected tests or samples, and current instrument status."
                   />
                 </div>
-                <div className={`field ${errorClass("complaint")}`}>
-                  <FieldLabel
-                    htmlFor="complaint"
-                    label="Complaint case?"
-                    cn="是否为投诉类"
-                    required
-                  />
-                  <select
-                    id="complaint"
-                    name="complaint"
-                    value={form.complaint}
-                    onChange={updateField}
-                  >
-                    <option value="">Select</option>
-                    <option>No</option>
-                    <option>Yes</option>
-                  </select>
-                </div>
                 <div className={`field ${errorClass("faultLevel")}`}>
                   <FieldLabel
                     htmlFor="faultLevel"
@@ -889,21 +817,6 @@ function TicketDesk({
                     readOnly
                     className="derived-field"
                   />
-                </div>
-                <div className="field">
-                  <FieldLabel htmlFor="priority" label="Priority" cn="优先级" />
-                  <select
-                    id="priority"
-                    name="priority"
-                    value={form.priority}
-                    onChange={updateField}
-                  >
-                    <option value="">Select</option>
-                    <option>Low</option>
-                    <option>Medium</option>
-                    <option>High</option>
-                    <option>Highest</option>
-                  </select>
                 </div>
                 <div className="definition-panel field-wide" id="fault-level-guide">
                   <h3>Fault level guide</h3>
@@ -964,9 +877,10 @@ function TicketDesk({
                   <input
                     id="occurredAt"
                     name="occurredAt"
-                    type="datetime-local"
+                    type="text"
                     value={form.occurredAt}
                     onChange={updateField}
+                    placeholder="e.g. 31 Jul 2026, 14:30"
                   />
                 </div>
               </div>
@@ -1131,15 +1045,15 @@ function TicketDesk({
                       <dl>
                         <div>
                           <dt>Reporter</dt>
-                          <dd>{ticket.employeeName} · {ticket.employeeId}</dd>
+                          <dd>
+                            {ticket.employeeId
+                              ? `${ticket.employeeName} · ${ticket.employeeId}`
+                              : ticket.employeeName}
+                          </dd>
                         </div>
                         <div>
                           <dt>Email</dt>
                           <dd>{ticket.email || "Not recorded"}</dd>
-                        </div>
-                        <div>
-                          <dt>Issue category</dt>
-                          <dd>{ticket.serviceType}</dd>
                         </div>
                         <div>
                           <dt>Product / model</dt>
@@ -1148,10 +1062,6 @@ function TicketDesk({
                         <div>
                           <dt>Current result</dt>
                           <dd>{ticket.currentResult}</dd>
-                        </div>
-                        <div>
-                          <dt>Priority</dt>
-                          <dd>{ticket.priority || "Not recorded"}</dd>
                         </div>
                       </dl>
                       <div className="ticket-narrative">

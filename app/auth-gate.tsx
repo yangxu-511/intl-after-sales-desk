@@ -6,7 +6,12 @@ import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 const SUPABASE_URL = "https://mesbcospesuhuojhftxs.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lc2Jjb3NwZXN1aHVvamhmdHhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0ODYxNDUsImV4cCI6MjEwMTA2MjE0NX0.T8v8FMpDp9QGxveTHqpYeqr7AS0Zz6DU3PH_tOM0jdM";
-const ALLOWED_EMAILS = new Set(["grel_xu@outlook.com"]);
+const ALLOWED_EMAILS = new Set([
+  "grel_xu@outlook.com",
+  "elephantsimon@163.com",
+  "839079040@qq.com",
+  "xu.yang2@getein.cn",
+]);
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
@@ -35,7 +40,7 @@ function normalizedEmail(session: Session | null) {
 export default function AuthGate({ children }: AuthGateProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
-  const [email, setEmail] = useState("grel_xu@outlook.com");
+  const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -181,6 +186,7 @@ export default function AuthGate({ children }: AuthGateProps) {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             autoComplete="email"
+            placeholder="name@company.com"
             required
           />
           <button className="button button-primary" type="submit" disabled={submitting}>
