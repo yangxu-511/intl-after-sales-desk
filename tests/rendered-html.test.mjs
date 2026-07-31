@@ -41,6 +41,8 @@ test("renders the international after-sales ticket system", async () => {
   assert.match(html, /Customer issue description/);
   assert.match(html, /Ticket records/);
   assert.match(html, /No SalesEasy CRM write-back/);
+  assert.doesNotMatch(html, /Market region/);
+  assert.doesNotMatch(html, /Select the internal region/);
   assert.doesNotMatch(html, /codex-preview/);
   assert.doesNotMatch(html, /react-loading-skeleton/);
 });

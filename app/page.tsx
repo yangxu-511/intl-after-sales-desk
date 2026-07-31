@@ -12,7 +12,6 @@ type TicketForm = {
   employeeName: string;
   employeeId: string;
   email: string;
-  region: string;
   country: string;
   distributor: string;
   customer: string;
@@ -49,7 +48,6 @@ const initialForm: TicketForm = {
   employeeName: "",
   employeeId: "",
   email: "",
-  region: "",
   country: "",
   distributor: "",
   customer: "",
@@ -231,16 +229,27 @@ export default function Home() {
         const savedDraft = window.localStorage.getItem(DRAFT_KEY);
         const savedSubmissions = window.localStorage.getItem(SUBMISSIONS_KEY);
         if (savedDraft) {
+          const parsedDraft = JSON.parse(savedDraft) as Partial<TicketForm> & {
+            region?: unknown;
+          };
+          delete parsedDraft.region;
           const restoredDraft = {
             ...initialForm,
-            ...JSON.parse(savedDraft),
+            ...parsedDraft,
           } as TicketForm;
           setForm(normalizeFaultSeverity(restoredDraft));
           setSaveState("Draft restored from this device");
         }
         if (savedSubmissions) {
-          const restoredSubmissions = JSON.parse(savedSubmissions) as Submission[];
-          setSubmissions(restoredSubmissions.map(normalizeFaultSeverity));
+          const restoredSubmissions = JSON.parse(savedSubmissions) as Array<
+            Submission & { region?: unknown }
+          >;
+          setSubmissions(
+            restoredSubmissions.map((ticket) => {
+              delete ticket.region;
+              return normalizeFaultSeverity(ticket);
+            }),
+          );
         }
       } catch {
         setSaveState("Local save is unavailable");
@@ -384,7 +393,6 @@ export default function Home() {
       "employeeName",
       "employeeId",
       "email",
-      "region",
       "country",
       "distributor",
       "customer",
@@ -599,20 +607,6 @@ export default function Home() {
                 subtitle="Where is support needed?"
               />
               <div className="field-grid">
-                <div className="field">
-                  <FieldLabel htmlFor="region" label="Market region" cn="区域" />
-                  <select
-                    id="region"
-                    name="region"
-                    value={form.region}
-                    onChange={updateField}
-                  >
-                    <option value="">Select the internal region</option>
-                    {["Region 1", "Region 2", "Region 3", "Region 4", "Region 5", "Region 6", "Special Region"].map(
-                      (item) => <option key={item}>{item}</option>,
-                    )}
-                  </select>
-                </div>
                 <div className={`field ${errorClass("country")}`}>
                   <FieldLabel
                     htmlFor="country"
