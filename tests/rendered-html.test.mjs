@@ -70,6 +70,13 @@ test("keeps the authenticated ticket form and removes obsolete fields", async ()
     /restoredDraft\.employeeName = reporterDefaults\.employeeName/,
   );
   assert.match(source, /restoredDraft\.email = reporterDefaults\.email/);
+  assert.doesNotMatch(requiredFields[1], /"currentResult"/);
+  assert.doesNotMatch(source, /Actions & result/);
+  assert.doesNotMatch(source, /Troubleshooting \/ actions taken/);
+  assert.doesNotMatch(source, /Current result/);
+  assert.doesNotMatch(source, /Validation \/ follow-up notes/);
+  assert.doesNotMatch(source, /Result and follow-up/);
+  assert.match(source, /number="05"\s+title="Evidence"/);
 });
 
 test("keeps the approved email access list", async () => {

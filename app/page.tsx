@@ -28,9 +28,6 @@ type TicketForm = {
   downtimeStatus: string;
   downtimeHours: string;
   occurredAt: string;
-  actionsTaken: string;
-  currentResult: string;
-  validationNotes: string;
   attachmentNames: string[];
 };
 
@@ -61,9 +58,6 @@ const initialForm: TicketForm = {
   downtimeStatus: "",
   downtimeHours: "",
   occurredAt: "",
-  actionsTaken: "",
-  currentResult: "",
-  validationNotes: "",
   attachmentNames: [],
 };
 
@@ -78,7 +72,6 @@ const requiredFields: Array<keyof TicketForm> = [
   "issueDescription",
   "faultLevel",
   "severity",
-  "currentResult",
 ];
 
 const productCategories = [
@@ -107,16 +100,6 @@ const ticketTemplateItems = [
     example:
       "On [date/time], [customer/site] reported [symptom]. The issue affects [tests, samples, or workflow]. Error message: [exact text].",
   },
-  {
-    title: "Actions taken",
-    example:
-      "Checked [items], performed [actions], and observed [result].",
-  },
-  {
-    title: "Result and follow-up",
-    example:
-      "Current status: [resolved or pending]. Next action: [owner, action, and expected time].",
-  },
 ];
 
 const crmFieldMap = [
@@ -125,8 +108,6 @@ const crmFieldMap = [
   ["Fault level", "故障等级"],
   ["Severity", "严重程度"],
   ["Issue description", "客户问题描述"],
-  ["Actions taken", "工作描述"],
-  ["Validation notes", "验证情况说明"],
 ];
 
 function FieldLabel({
@@ -214,11 +195,17 @@ function TicketDesk({
             serviceType?: unknown;
             complaint?: unknown;
             priority?: unknown;
+            actionsTaken?: unknown;
+            currentResult?: unknown;
+            validationNotes?: unknown;
           };
           delete parsedDraft.region;
           delete parsedDraft.serviceType;
           delete parsedDraft.complaint;
           delete parsedDraft.priority;
+          delete parsedDraft.actionsTaken;
+          delete parsedDraft.currentResult;
+          delete parsedDraft.validationNotes;
           const restoredDraft = {
             ...initialForm,
             ...parsedDraft,
@@ -235,6 +222,9 @@ function TicketDesk({
               serviceType?: unknown;
               complaint?: unknown;
               priority?: unknown;
+              actionsTaken?: unknown;
+              currentResult?: unknown;
+              validationNotes?: unknown;
             }
           >;
           setSubmissions(
@@ -243,6 +233,9 @@ function TicketDesk({
               delete ticket.serviceType;
               delete ticket.complaint;
               delete ticket.priority;
+              delete ticket.actionsTaken;
+              delete ticket.currentResult;
+              delete ticket.validationNotes;
               return normalizeFaultSeverity(ticket);
             }),
           );
@@ -404,9 +397,6 @@ function TicketDesk({
       "downtimeStatus",
       "downtimeHours",
       "occurredAt",
-      "actionsTaken",
-      "currentResult",
-      "validationNotes",
       "attachmentNames",
     ];
     const rows = [
@@ -889,68 +879,6 @@ function TicketDesk({
             <section className="form-section">
               <SectionTitle
                 number="05"
-                title="Actions & result"
-                subtitle="Record what has already been done."
-              />
-              <div className="field-grid">
-                <div className="field field-wide">
-                  <FieldLabel
-                    htmlFor="actionsTaken"
-                    label="Troubleshooting / actions taken"
-                    cn="已采取的处理措施"
-                  />
-                  <textarea
-                    id="actionsTaken"
-                    name="actionsTaken"
-                    value={form.actionsTaken}
-                    onChange={updateField}
-                    rows={4}
-                    placeholder="List the checks, settings, replacements, remote guidance, or coordination already completed."
-                  />
-                </div>
-                <div className={`field field-wide ${errorClass("currentResult")}`}>
-                  <FieldLabel
-                    htmlFor="currentResult"
-                    label="Current result"
-                    cn="当前处理结果"
-                    required
-                  />
-                  <select
-                    id="currentResult"
-                    name="currentResult"
-                    value={form.currentResult}
-                    onChange={updateField}
-                  >
-                    <option value="">Select current result</option>
-                    <option>Resolved and verified</option>
-                    <option>Temporary solution provided</option>
-                    <option>Pending customer verification</option>
-                    <option>Pending spare parts</option>
-                    <option>Pending R&D / quality support</option>
-                    <option>Unresolved</option>
-                  </select>
-                </div>
-                <div className="field field-wide">
-                  <FieldLabel
-                    htmlFor="validationNotes"
-                    label="Validation / follow-up notes"
-                    cn="验证情况与后续事项"
-                  />
-                  <textarea
-                    id="validationNotes"
-                    name="validationNotes"
-                    value={form.validationNotes}
-                    onChange={updateField}
-                    rows={3}
-                    placeholder="How was recovery confirmed? What still needs to happen?"
-                  />
-                </div>
-              </div>
-            </section>
-
-            <section className="form-section">
-              <SectionTitle
-                number="06"
                 title="Evidence"
                 subtitle="Add filenames for photos, logs, or reports."
               />
@@ -1058,10 +986,6 @@ function TicketDesk({
                         <div>
                           <dt>Product / model</dt>
                           <dd>{ticket.productName} · {ticket.modelOrItem}</dd>
-                        </div>
-                        <div>
-                          <dt>Current result</dt>
-                          <dd>{ticket.currentResult}</dd>
                         </div>
                       </dl>
                       <div className="ticket-narrative">
