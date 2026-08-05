@@ -1,11 +1,8 @@
 "use client";
 
-import { createClient, Session } from "@supabase/supabase-js";
+import { Session } from "@supabase/supabase-js";
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
-
-const SUPABASE_URL = "https://mesbcospesuhuojhftxs.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1lc2Jjb3NwZXN1aHVvamhmdHhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0ODYxNDUsImV4cCI6MjEwMTA2MjE0NX0.T8v8FMpDp9QGxveTHqpYeqr7AS0Zz6DU3PH_tOM0jdM";
+import { supabase } from "./supabase";
 const ALLOWED_EMAILS = new Set([
   "grel_xu@outlook.com",
   "elephantsimon@163.com",
@@ -13,15 +10,8 @@ const ALLOWED_EMAILS = new Set([
   "xu.yang2@getein.cn",
 ]);
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    persistSession: true,
-  },
-});
-
 export type AccessUser = {
+  id: string;
   displayName: string;
   email: string;
 };
@@ -101,6 +91,7 @@ export default function AuthGate({ children }: AuthGateProps) {
     const address = normalizedEmail(session);
     const metadataName = session.user.user_metadata?.name;
     return {
+      id: session.user.id,
       email: address,
       displayName:
         typeof metadataName === "string" && metadataName.trim()
