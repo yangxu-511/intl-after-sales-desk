@@ -11,6 +11,7 @@ employees.
 - automatic draft saving in the current browser
 - local submission history and CSV export
 - Supabase-backed pending queue with row-level access rules
+- administrator-only read-only ticket totals and latest registration details
 - local Codex collection and explicit confirmation before SalesEasy CRM creation
 - duplicate-prevention states and CRM readback recording
 - no automatic CRM transfer or approval
@@ -22,6 +23,9 @@ Apply the SQL migration in
 `supabase/migrations/202608040001_create_ticket_submissions.sql` to the existing
 Supabase project. The migration creates the queue table and row-level security
 rules (database rules that restrict each signed-in employee to their own rows).
+Apply all later migrations in filename order. The administrator dashboard
+functions verify `xu.yang2@getein.cn` in the signed Supabase session before
+returning totals, reporter names, email addresses, or ticket content.
 
 For the local collector, copy `config/ticket-queue.env.example` to
 `config/ticket-queue.env` and add the Supabase service-role key. This file is

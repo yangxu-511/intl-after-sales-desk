@@ -8,6 +8,7 @@ import {
   severityForFaultLevel,
 } from "./ticket-utils";
 import AuthGate, { AccessUser } from "./auth-gate";
+import AdminDashboard from "./admin-dashboard";
 import { supabase } from "./supabase";
 
 type TicketForm = {
@@ -612,6 +613,8 @@ function TicketDesk({
         </aside>
 
         <section className="form-column">
+          <AdminDashboard userEmail={user.email} />
+
           {successId && (
             <div className="success-banner" role="status">
               <span className="success-check" aria-hidden="true">✓</span>
