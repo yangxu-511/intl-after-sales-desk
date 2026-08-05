@@ -8,6 +8,7 @@ const ALLOWED_EMAILS = new Set([
   "elephantsimon@163.com",
   "839079040@qq.com",
   "xu.yang2@getein.cn",
+  "m.rabia@getein.com.cn",
 ]);
 
 export type AccessUser = {
