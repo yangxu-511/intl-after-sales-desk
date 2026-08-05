@@ -101,6 +101,34 @@ test("keeps the approved email access list", async () => {
   assert.doesNotMatch(source, /Send sign-in link/);
 });
 
+test("adds a server-protected read-only administrator ticket overview", async () => {
+  const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const dashboardSource = await readFile(new URL("../app/admin-dashboard.tsx", import.meta.url), "utf8");
+  const migrationSource = await readFile(
+    new URL("../supabase/migrations/202608050001_add_admin_ticket_dashboard.sql", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(pageSource, /<AdminDashboard userEmail=\{user\.email\} \/>/);
+  assert.match(dashboardSource, /ADMIN_EMAIL = "xu\.yang2@getein\.cn"/);
+  assert.match(dashboardSource, /Registered ticket overview/);
+  assert.match(dashboardSource, /submitter_name/);
+  assert.match(dashboardSource, /submitter_email/);
+  assert.match(dashboardSource, /Service address \/ 服务地址/);
+  assert.match(dashboardSource, /Attachments \/ 附件名称/);
+  assert.match(dashboardSource, /Issue content \/ 工单内容/);
+  assert.match(dashboardSource, /get_ticket_submission_admin_summary/);
+  assert.match(dashboardSource, /get_ticket_submission_admin_rows/);
+
+  assert.match(migrationSource, /security definer/);
+  assert.match(migrationSource, /auth\.jwt\(\) ->> 'email'/);
+  assert.match(migrationSource, /<> 'xu\.yang2@getein\.cn'/);
+  assert.match(migrationSource, /raise exception 'administrator access required'/);
+  assert.match(migrationSource, /revoke all on function public\.get_ticket_submission_admin_rows\(integer, integer\) from public/);
+  assert.match(migrationSource, /grant execute on function public\.get_ticket_submission_admin_rows\(integer, integer\) to authenticated/);
+  assert.match(migrationSource, /limit least\(greatest\(coalesce\(p_limit, 100\), 1\), 100\)/);
+});
+
 test("uses consistent fault levels and date-time export names", () => {
   assert.equal(severityForFaultLevel("Level 1"), "Severe");
   assert.equal(severityForFaultLevel("Level 2"), "Moderate");
