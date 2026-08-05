@@ -45,7 +45,7 @@ test("renders the secure access gate before the ticket system", async () => {
   assert.doesNotMatch(html, /react-loading-skeleton/);
 });
 
-test("keeps the authenticated ticket form and removes obsolete fields", async () => {
+test("keeps the authenticated ticket form and adds the CRM queue fields", async () => {
   const source = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   assert.match(source, /New after-sales ticket/);
   assert.match(source, /English ticket template/);
@@ -53,18 +53,26 @@ test("keeps the authenticated ticket form and removes obsolete fields", async ()
   assert.match(source, /Ticket records/);
   assert.match(source, /31 Jul 2026, 14:30/);
   assert.doesNotMatch(source, /Market region/);
-  assert.doesNotMatch(source, /Select the internal region/);
-  assert.doesNotMatch(source, /Service type/);
-  assert.doesNotMatch(source, /Complaint case\?/);
+  assert.match(source, /Internal service region/);
+  assert.match(source, /Online service type/);
+  assert.match(source, /Complaint case\?/);
+  assert.match(source, /Service address/);
+  assert.match(source, /Requested support time \(Beijing time\)/);
   assert.doesNotMatch(source, /Priority/);
   assert.doesNotMatch(source, /Issue \/ service category guide/);
-  assert.doesNotMatch(source, /datetime-local/);
+  assert.match(source, /datetime-local/);
+  assert.match(source, /ticket_submissions/);
+  assert.match(source, /target_crm_owner: "徐阳"/);
 
   const requiredFields = source.match(
     /const requiredFields: Array<keyof TicketForm> = \[([\s\S]*?)\];/,
   );
   assert.ok(requiredFields);
   assert.doesNotMatch(requiredFields[1], /"employeeId"/);
+  assert.match(requiredFields[1], /"address"/);
+  assert.match(requiredFields[1], /"onlineServiceType"/);
+  assert.match(requiredFields[1], /"complaintCase"/);
+  assert.match(requiredFields[1], /"requestedSupportAt"/);
   assert.match(
     source,
     /restoredDraft\.employeeName = reporterDefaults\.employeeName/,

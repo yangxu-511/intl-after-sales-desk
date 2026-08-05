@@ -8,12 +8,15 @@ import {
   severityForFaultLevel,
 } from "./ticket-utils";
 import AuthGate, { AccessUser } from "./auth-gate";
+import { supabase } from "./supabase";
 
 type TicketForm = {
   employeeName: string;
   employeeId: string;
   email: string;
   country: string;
+  address: string;
+  internalRegion: string;
   distributor: string;
   customer: string;
   productCategory: string;
@@ -23,27 +26,39 @@ type TicketForm = {
   reagentLot: string;
   issueTitle: string;
   issueDescription: string;
+  onlineServiceType: string;
+  complaintCase: string;
   faultLevel: string;
   severity: string;
   downtimeStatus: string;
   downtimeHours: string;
   occurredAt: string;
+  requestedSupportAt: string;
   attachmentNames: string[];
 };
 
 type Submission = TicketForm & {
   ticketId: string;
   submittedAt: string;
+  queueStatus?: "pending";
+};
+
+type PendingSubmissionRequest = {
+  id: string;
+  ticketId: string;
 };
 
 const DRAFT_KEY = "gbase-after-sales-ticket-draft-v1";
 const SUBMISSIONS_KEY = "gbase-after-sales-ticket-submissions-v1";
+const PENDING_REQUEST_KEY = "gbase-after-sales-ticket-pending-request-v1";
 
 const initialForm: TicketForm = {
   employeeName: "",
   employeeId: "",
   email: "",
   country: "",
+  address: "",
+  internalRegion: "",
   distributor: "",
   customer: "",
   productCategory: "",
@@ -53,41 +68,67 @@ const initialForm: TicketForm = {
   reagentLot: "",
   issueTitle: "",
   issueDescription: "",
+  onlineServiceType: "",
+  complaintCase: "",
   faultLevel: "",
   severity: "",
   downtimeStatus: "",
   downtimeHours: "",
   occurredAt: "",
+  requestedSupportAt: "",
   attachmentNames: [],
 };
 
 const requiredFields: Array<keyof TicketForm> = [
   "employeeName",
   "country",
+  "address",
+  "internalRegion",
   "customer",
   "productCategory",
   "productName",
   "modelOrItem",
   "issueTitle",
   "issueDescription",
+  "onlineServiceType",
+  "complaintCase",
   "faultLevel",
   "severity",
+  "requestedSupportAt",
 ];
 
 const productCategories = [
-  "Hematology instrument",
-  "Hematology reagent",
-  "Chemiluminescence instrument",
-  "Chemiluminescence reagent",
-  "Coagulation instrument",
-  "Coagulation reagent",
-  "Biochemistry instrument",
-  "Biochemistry reagent",
-  "Molecular diagnostics instrument",
-  "Molecular diagnostics reagent",
-  "POCT instrument",
-  "POCT reagent",
-  "Biochemistry & immunoassay automation",
+  { value: "Hematology instrument", label: "Hematology instrument", crmCode: 1, crmLabel: "血球产品" },
+  { value: "Hematology reagent", label: "Hematology reagent", crmCode: 1, crmLabel: "血球产品" },
+  { value: "Chemiluminescence instrument", label: "Chemiluminescence instrument", crmCode: 2, crmLabel: "发光仪器" },
+  { value: "Coagulation reagent", label: "Coagulation reagent", crmCode: 3, crmLabel: "血凝试剂" },
+  { value: "Coagulation instrument", label: "Coagulation instrument", crmCode: 4, crmLabel: "血凝仪器" },
+  { value: "Biochemistry & immunoassay automation", label: "Biochemistry & immunoassay automation", crmCode: 5, crmLabel: "生免流水线仪器" },
+  { value: "Molecular diagnostics reagent", label: "Molecular diagnostics reagent", crmCode: 6, crmLabel: "分子诊断试剂" },
+  { value: "Molecular diagnostics instrument", label: "Molecular diagnostics instrument", crmCode: 7, crmLabel: "分子诊断仪器" },
+  { value: "Biochemistry reagent", label: "Biochemistry reagent", crmCode: 8, crmLabel: "生化试剂" },
+  { value: "Biochemistry instrument", label: "Biochemistry instrument", crmCode: 9, crmLabel: "生化仪器" },
+  { value: "Chemiluminescence reagent", label: "Chemiluminescence reagent", crmCode: 10, crmLabel: "发光试剂" },
+  { value: "POCT instrument", label: "POCT instrument", crmCode: 11, crmLabel: "POCT仪器" },
+  { value: "POCT reagent", label: "POCT reagent", crmCode: 12, crmLabel: "POCT试剂" },
+];
+
+const internalRegions = [
+  { value: "1", label: "Region 1 / 一区" },
+  { value: "2", label: "Region 2 / 二区" },
+  { value: "3", label: "Region 3 / 三区" },
+  { value: "4", label: "Region 4 / 四区" },
+  { value: "5", label: "Region 5 / 五区" },
+  { value: "6", label: "Region 6 / 六区" },
+  { value: "7", label: "Special region / 特区" },
+];
+
+const onlineServiceTypes = [
+  { value: "1", label: "Instrument issue / 仪器问题" },
+  { value: "2", label: "Reagent issue / 试剂问题" },
+  { value: "3", label: "Online installation / 线上装机" },
+  { value: "4", label: "Remote service guidance / 远程服务指导" },
+  { value: "5", label: "Market refurbishment repair / 市场翻新维修" },
 ];
 
 const ticketTemplateItems = [
@@ -105,9 +146,9 @@ const ticketTemplateItems = [
 const crmFieldMap = [
   ["Product category", "产品分类"],
   ["Model / reagent item", "型号 or 试剂项目"],
+  ["Online service type", "线上服务类型"],
+  ["Complaint case", "是否为投诉类"],
   ["Fault level", "故障等级"],
-  ["Severity", "严重程度"],
-  ["Issue description", "客户问题描述"],
 ];
 
 function FieldLabel({
@@ -151,11 +192,29 @@ function SectionTitle({
   );
 }
 
-function createTicketId() {
+function createTicketId(requestId: string) {
   const now = new Date();
-  const date = now.toISOString().slice(0, 10).replaceAll("-", "");
-  const time = now.toTimeString().slice(0, 8).replaceAll(":", "");
-  return `INT-${date}-${time}`;
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const date = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
+  const time = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  return `INT-${date}-${time}-${requestId.slice(0, 4).toUpperCase()}`;
+}
+
+function getOrCreatePendingRequest(): PendingSubmissionRequest {
+  const saved = window.localStorage.getItem(PENDING_REQUEST_KEY);
+  if (saved) {
+    try {
+      const request = JSON.parse(saved) as PendingSubmissionRequest;
+      if (request.id && request.ticketId) return request;
+    } catch {
+      window.localStorage.removeItem(PENDING_REQUEST_KEY);
+    }
+  }
+
+  const id = window.crypto.randomUUID();
+  const request = { id, ticketId: createTicketId(id) };
+  window.localStorage.setItem(PENDING_REQUEST_KEY, JSON.stringify(request));
+  return request;
 }
 
 function csvEscape(value: string | string[]) {
@@ -183,6 +242,8 @@ function TicketDesk({
   const [saveState, setSaveState] = useState("Draft not started");
   const [errors, setErrors] = useState<Array<keyof TicketForm>>([]);
   const [successId, setSuccessId] = useState("");
+  const [submissionError, setSubmissionError] = useState("");
+  const [submittingTicket, setSubmittingTicket] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -303,11 +364,13 @@ function TicketDesk({
         current.filter((item) => item !== "faultLevel" && item !== "severity"),
       );
       setSuccessId("");
+      setSubmissionError("");
       return;
     }
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => current.filter((item) => item !== field));
     setSuccessId("");
+    setSubmissionError("");
   }
 
   function handleFiles(event: ChangeEvent<HTMLInputElement>) {
@@ -334,11 +397,13 @@ function TicketDesk({
     setForm({ ...initialForm, ...reporterDefaults });
     setErrors([]);
     setSuccessId("");
+    setSubmissionError("");
     window.localStorage.removeItem(DRAFT_KEY);
+    window.localStorage.removeItem(PENDING_REQUEST_KEY);
     setSaveState("Draft cleared");
   }
 
-  function submitTicket(event: FormEvent<HTMLFormElement>) {
+  async function submitTicket(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const missing = requiredFields.filter((field) => {
       const value = form[field];
@@ -353,16 +418,65 @@ function TicketDesk({
       return;
     }
 
+    setSubmittingTicket(true);
+    setSubmissionError("");
+    let request: PendingSubmissionRequest;
+    try {
+      request = getOrCreatePendingRequest();
+    } catch {
+      setSubmittingTicket(false);
+      setSubmissionError(
+        "This browser cannot create a safe submission reference. Please keep the draft and try again.",
+      );
+      return;
+    }
     const submission: Submission = {
       ...form,
-      ticketId: createTicketId(),
+      ticketId: request.ticketId,
       submittedAt: new Date().toISOString(),
+      queueStatus: "pending",
     };
     const next = [submission, ...submissions].slice(0, 20);
+
+    const productCategory = productCategories.find(
+      (item) => item.value === form.productCategory,
+    );
+    const payload = {
+      ...form,
+      productCategoryCrmCode: productCategory?.crmCode ?? null,
+      productCategoryCrmLabel: productCategory?.crmLabel ?? form.productCategory,
+      reporterUserId: user.id,
+    };
+
+    const { error } = await supabase.from("ticket_submissions").upsert(
+      {
+        id: request.id,
+        client_ticket_id: request.ticketId,
+        submitter_user_id: user.id,
+        submitter_name: form.employeeName,
+        submitter_email: user.email,
+        payload,
+        status: "pending",
+        target_crm_owner: "徐阳",
+      },
+      { onConflict: "id", ignoreDuplicates: true },
+    );
+
+    if (error) {
+      setSubmittingTicket(false);
+      setSubmissionError(
+        error.code === "PGRST205"
+          ? "The secure ticket queue is not ready yet. Please keep this draft and contact support."
+          : "The ticket could not reach the secure queue. Your draft is still saved; please try again.",
+      );
+      setSaveState("Cloud submission failed · draft preserved");
+      return;
+    }
 
     try {
       window.localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(next));
       window.localStorage.removeItem(DRAFT_KEY);
+      window.localStorage.removeItem(PENDING_REQUEST_KEY);
       setSubmissions(next);
       setSuccessId(submission.ticketId);
       setForm({ ...initialForm, ...reporterDefaults });
@@ -370,7 +484,10 @@ function TicketDesk({
       setSaveState("Ready for a new ticket");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
-      setSaveState("Submission could not be saved on this device");
+      setSuccessId(submission.ticketId);
+      setSaveState("Queued securely · local history could not be updated");
+    } finally {
+      setSubmittingTicket(false);
     }
   }
 
@@ -383,6 +500,8 @@ function TicketDesk({
       "employeeId",
       "email",
       "country",
+      "address",
+      "internalRegion",
       "distributor",
       "customer",
       "productCategory",
@@ -392,11 +511,14 @@ function TicketDesk({
       "reagentLot",
       "issueTitle",
       "issueDescription",
+      "onlineServiceType",
+      "complaintCase",
       "faultLevel",
       "severity",
       "downtimeStatus",
       "downtimeHours",
       "occurredAt",
+      "requestedSupportAt",
       "attachmentNames",
     ];
     const rows = [
@@ -432,7 +554,7 @@ function TicketDesk({
         <div className="topbar-actions">
           <div className="privacy-pill">
             <span aria-hidden="true">●</span>
-            Local-only data
+            Secure cloud queue
           </div>
           <div className="session-pill">
             <span>{user.email}</span>
@@ -448,8 +570,8 @@ function TicketDesk({
           <div className="eyebrow">FIELD SUPPORT INTAKE · V1</div>
           <h1>Report the issue.<br />Keep support moving.</h1>
           <p className="intro-copy">
-            A focused form for international service teams. Your draft and
-            submissions stay in this browser until you export them.
+            A focused form for international service teams. Drafts stay on this
+            device; submitted tickets enter a secure review queue before CRM upload.
           </p>
 
           <div className="progress-card" aria-label={`${progress}% complete`}>
@@ -494,10 +616,10 @@ function TicketDesk({
             <div className="success-banner" role="status">
               <span className="success-check" aria-hidden="true">✓</span>
               <div>
-                <strong>Ticket saved on this device</strong>
+                <strong>Ticket submitted securely</strong>
                 <p>
-                  Reference <b>{successId}</b>. Export the record before moving
-                  to another browser or device.
+                  Reference <b>{successId}</b> is in the secure queue and awaits
+                  review before SalesEasy CRM upload.
                 </p>
               </div>
             </div>
@@ -534,6 +656,12 @@ function TicketDesk({
             <div className="error-summary" role="alert">
               Please complete the {errors.length} highlighted required
               {errors.length === 1 ? " field" : " fields"}.
+            </div>
+          )}
+
+          {submissionError && (
+            <div className="error-summary" role="alert">
+              {submissionError}
             </div>
           )}
 
@@ -613,6 +741,41 @@ function TicketDesk({
                     autoComplete="country-name"
                   />
                 </div>
+                <div className={`field ${errorClass("address")}`}>
+                  <FieldLabel
+                    htmlFor="address"
+                    label="Service address"
+                    cn="服务地址"
+                    required
+                  />
+                  <input
+                    id="address"
+                    name="address"
+                    value={form.address}
+                    onChange={updateField}
+                    placeholder="Hospital, city and detailed address"
+                    autoComplete="street-address"
+                  />
+                </div>
+                <div className={`field ${errorClass("internalRegion")}`}>
+                  <FieldLabel
+                    htmlFor="internalRegion"
+                    label="Internal service region"
+                    cn="外贸区域"
+                    required
+                  />
+                  <select
+                    id="internalRegion"
+                    name="internalRegion"
+                    value={form.internalRegion}
+                    onChange={updateField}
+                  >
+                    <option value="">Select region</option>
+                    {internalRegions.map((item) => (
+                      <option key={item.value} value={item.value}>{item.label}</option>
+                    ))}
+                  </select>
+                </div>
                 <div className="field">
                   <FieldLabel
                     htmlFor="distributor"
@@ -667,7 +830,7 @@ function TicketDesk({
                   >
                     <option value="">Select category</option>
                     {productCategories.map((item) => (
-                      <option key={item}>{item}</option>
+                      <option key={item.value} value={item.value}>{item.label}</option>
                     ))}
                   </select>
                 </div>
@@ -769,6 +932,43 @@ function TicketDesk({
                     rows={5}
                     placeholder="Include the error message, when it started, frequency, affected tests or samples, and current instrument status."
                   />
+                </div>
+                <div className={`field ${errorClass("onlineServiceType")}`}>
+                  <FieldLabel
+                    htmlFor="onlineServiceType"
+                    label="Online service type"
+                    cn="线上服务类型"
+                    required
+                  />
+                  <select
+                    id="onlineServiceType"
+                    name="onlineServiceType"
+                    value={form.onlineServiceType}
+                    onChange={updateField}
+                  >
+                    <option value="">Select service type</option>
+                    {onlineServiceTypes.map((item) => (
+                      <option key={item.value} value={item.value}>{item.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className={`field ${errorClass("complaintCase")}`}>
+                  <FieldLabel
+                    htmlFor="complaintCase"
+                    label="Complaint case?"
+                    cn="是否为投诉类"
+                    required
+                  />
+                  <select
+                    id="complaintCase"
+                    name="complaintCase"
+                    value={form.complaintCase}
+                    onChange={updateField}
+                  >
+                    <option value="">Select</option>
+                    <option value="2">No / 否</option>
+                    <option value="1">Yes / 是</option>
+                  </select>
                 </div>
                 <div className={`field ${errorClass("faultLevel")}`}>
                   <FieldLabel
@@ -873,6 +1073,21 @@ function TicketDesk({
                     placeholder="e.g. 31 Jul 2026, 14:30"
                   />
                 </div>
+                <div className={`field field-wide ${errorClass("requestedSupportAt")}`}>
+                  <FieldLabel
+                    htmlFor="requestedSupportAt"
+                    label="Requested support time (Beijing time)"
+                    cn="预约开始时间（北京时间）"
+                    required
+                  />
+                  <input
+                    id="requestedSupportAt"
+                    name="requestedSupportAt"
+                    type="datetime-local"
+                    value={form.requestedSupportAt}
+                    onChange={updateField}
+                  />
+                </div>
               </div>
             </section>
 
@@ -911,8 +1126,12 @@ function TicketDesk({
 
             <div className="form-actions">
               <div>
-                <button className="button button-primary" type="submit">
-                  Save ticket
+                <button
+                  className="button button-primary"
+                  type="submit"
+                  disabled={submittingTicket}
+                >
+                  {submittingTicket ? "Submitting…" : "Submit ticket"}
                   <span aria-hidden="true">→</span>
                 </button>
                 <button className="button button-secondary" type="button" onClick={saveDraft}>
@@ -966,7 +1185,11 @@ function TicketDesk({
                       <div className="ticket-meta">
                         <strong>{ticket.ticketId}</strong>
                         <span>{new Date(ticket.submittedAt).toLocaleString()}</span>
-                        <small>View details</small>
+                        <small>
+                          {ticket.queueStatus === "pending"
+                            ? "Awaiting CRM review"
+                            : "Saved before cloud queue"}
+                        </small>
                       </div>
                     </summary>
                     <div className="ticket-details">
@@ -1001,7 +1224,7 @@ function TicketDesk({
 
           <footer>
             <strong>International Service Desk</strong>
-            <span>Standalone browser prototype · No SalesEasy CRM write-back</span>
+            <span>Secure intake queue · CRM upload requires confirmation</span>
           </footer>
         </section>
       </div>

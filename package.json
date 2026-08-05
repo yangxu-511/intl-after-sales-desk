@@ -11,9 +11,11 @@
     "build:pages": "GITHUB_PAGES=true next build",
     "build:vercel": "next build",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "queue": "node --env-file-if-exists=config/ticket-queue.env scripts/ticket-queue.mjs",
+    "queue:collect": "npm run queue -- collect"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.111.0",
