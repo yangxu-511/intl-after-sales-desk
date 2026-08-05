@@ -93,6 +93,7 @@ test("keeps the approved email access list", async () => {
   assert.match(source, /elephantsimon@163\.com/);
   assert.match(source, /839079040@qq\.com/);
   assert.match(source, /xu\.yang2@getein\.cn/);
+  assert.match(source, /m\.rabia@getein\.com\.cn/);
   assert.match(source, /signInWithPassword/);
   assert.match(source, /must_change_password/);
   assert.match(source, /Create a new password/);
